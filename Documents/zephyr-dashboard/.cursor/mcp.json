@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "zephyr-scale": {
+      "command": "npx",
+      "args": ["-y", "@smartbear/mcp"],
+      "env": {
+        "ZEPHYR_API_TOKEN": "${ZEPHYR_API_TOKEN}",
+        "ZEPHYR_BASE_URL": "https://api.zephyrscale.smartbear.com/v2"
+      }
+    }
+  }
+}
