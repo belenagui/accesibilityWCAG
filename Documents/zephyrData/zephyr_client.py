@@ -1,7 +1,11 @@
 import os
 import requests
+import urllib3
 from typing import Optional
 from dotenv import load_dotenv
+
+# Suppress SSL warnings caused by corporate proxy certificates
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 load_dotenv()
 
@@ -20,7 +24,7 @@ class ZephyrScaleClient:
 
     def _get(self, endpoint: str, params: dict = None) -> dict:
         url = f"{BASE_URL}/{endpoint}"
-        response = requests.get(url, headers=self.headers, params=params or {})
+        response = requests.get(url, headers=self.headers, params=params or {}, verify=False)
         response.raise_for_status()
         return response.json()
 
