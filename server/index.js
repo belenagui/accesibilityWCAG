@@ -33,6 +33,13 @@ app.post('/api/audit', (req, res) => {
   const isWindows = process.platform === 'win32'
   const cypressBin = path.join(__dirname, '..', 'node_modules', '.bin', isWindows ? 'cypress.cmd' : 'cypress')
 
+  // Verify Cypress binary exists before spawning
+  if (!fs.existsSync(cypressBin)) {
+    runStatus.running = false
+    runStatus.error = `Cypress binary not found at ${cypressBin}. Run: npm install`
+    return
+  }
+
   const child = spawn(
     cypressBin,
     ['run', '--spec', 'cypress/e2e/accessibility.cy.js', '--env', `url=${url}`],
@@ -41,6 +48,15 @@ app.post('/api/audit', (req, res) => {
       env: { ...process.env, FORCE_COLOR: '0' }
     }
   )
+
+  // Kill Cypress if it hangs for more than 2 minutes
+  const killTimer = setTimeout(() => {
+    if (runStatus.running) {
+      child.kill('SIGTERM')
+      runStatus.running = false
+      runStatus.error = 'Audit timed out after 2 minutes. The page may be unreachable or require authentication.'
+    }
+  }, 120000)
 
   child.stdout.on('data', d => {
     const line = d.toString().trim()
@@ -51,10 +67,18 @@ app.post('/api/audit', (req, res) => {
     if (line) runStatus.log.push(`[stderr] ${line}`)
   })
 
+  child.on('error', (err) => {
+    clearTimeout(killTimer)
+    runStatus.running = false
+    runStatus.error = `Failed to start Cypress: ${err.message}`
+  })
+
   child.on('close', (code) => {
+    clearTimeout(killTimer)
     runStatus.running = false
     if (code !== 0 && !fs.existsSync(RESULTS_FILE)) {
-      runStatus.error = `Cypress exited with code ${code}. Check logs.`
+      const lastLogs = runStatus.log.slice(-5).join(' | ')
+      runStatus.error = `Cypress exited with code ${code}. ${lastLogs}`
     }
   })
 })

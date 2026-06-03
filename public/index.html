@@ -419,8 +419,21 @@
 
     function pollForResults() {
       let dots = 0
+      let elapsed = 0
+      const MAX_WAIT = 130000 // 130 seconds — slightly over the server-side 120s kill timer
+
       pollInterval = setInterval(() => {
         dots = (dots + 1) % 4
+        elapsed += 1500
+
+        // Front-end safety net: stop polling if it takes too long
+        if (elapsed >= MAX_WAIT) {
+          clearInterval(pollInterval)
+          showError('Audit timed out. The page may be unreachable, password-protected, or blocking headless browsers.')
+          resetUI()
+          return
+        }
+
         fetch('/api/status')
           .then(r => r.json())
           .then(status => {
@@ -429,7 +442,7 @@
 
             if (status.error) {
               clearInterval(pollInterval)
-              showError(status.error + '<br><small>Logs: ' + status.log.slice(-5).join('<br>') + '</small>')
+              showError(status.error)
               resetUI()
               return
             }
