@@ -239,25 +239,23 @@ describe('WCAG Accessibility Audit', () => {
           })
         })
       },
-      true
+      false  // do not fail the test on violations — we collect and report them ourselves
     )
 
-    cy.window().then(win => {
-      cy.document().then(doc => {
-        const reportData = {
-          url: targetUrl,
-          timestamp: new Date().toISOString(),
-          violations,
-          summary: {
-            total: violations.length,
-            critical: violations.filter(v => v.impact === 'critical').length,
-            serious: violations.filter(v => v.impact === 'serious').length,
-            moderate: violations.filter(v => v.impact === 'moderate').length,
-            minor: violations.filter(v => v.impact === 'minor').length
-          }
+    cy.then(() => {
+      const reportData = {
+        url: targetUrl,
+        timestamp: new Date().toISOString(),
+        violations,
+        summary: {
+          total: violations.length,
+          critical: violations.filter(v => v.impact === 'critical').length,
+          serious: violations.filter(v => v.impact === 'serious').length,
+          moderate: violations.filter(v => v.impact === 'moderate').length,
+          minor: violations.filter(v => v.impact === 'minor').length
         }
-        cy.task('saveReport', reportData)
-      })
+      }
+      cy.task('saveReport', reportData)
     })
   })
 })
