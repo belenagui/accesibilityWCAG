@@ -1,0 +1,617 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>WCAG Accessibility Reporter</title>
+  <style>
+    :root {
+      --bg: #0f1117;
+      --surface: #1a1d27;
+      --surface2: #22263a;
+      --border: #2e3354;
+      --accent: #6c63ff;
+      --accent-light: #8b85ff;
+      --text: #e2e8f0;
+      --muted: #8892a4;
+      --critical: #ff4757;
+      --serious: #ff6b35;
+      --moderate: #ffa502;
+      --minor: #2ed573;
+      --pass: #26de81;
+      --code-bg: #0d1117;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+    }
+
+    header {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 20px 40px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+    .logo {
+      width: 40px; height: 40px;
+      background: var(--accent);
+      border-radius: 10px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 20px;
+    }
+    header h1 { font-size: 1.4rem; font-weight: 700; }
+    header p { font-size: 0.8rem; color: var(--muted); margin-top: 2px; }
+
+    .main { max-width: 1100px; margin: 0 auto; padding: 40px 24px; }
+
+    /* URL input section */
+    .url-section {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 32px;
+      margin-bottom: 32px;
+    }
+    .url-section h2 { font-size: 1.1rem; margin-bottom: 8px; }
+    .url-section p { color: var(--muted); font-size: 0.875rem; margin-bottom: 20px; }
+
+    .url-form { display: flex; gap: 12px; flex-wrap: wrap; }
+    .url-input {
+      flex: 1; min-width: 280px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 12px 16px;
+      color: var(--text);
+      font-size: 0.95rem;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    .url-input:focus { border-color: var(--accent); }
+    .url-input::placeholder { color: var(--muted); }
+
+    .btn {
+      padding: 12px 28px;
+      border-radius: 10px;
+      border: none;
+      font-size: 0.95rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: opacity 0.2s, transform 0.1s;
+    }
+    .btn:active { transform: scale(0.97); }
+    .btn-primary { background: var(--accent); color: #fff; }
+    .btn-primary:hover { opacity: 0.9; }
+    .btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    /* Status bar */
+    .status-bar {
+      display: none;
+      align-items: center;
+      gap: 12px;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 14px 18px;
+      margin-top: 16px;
+    }
+    .status-bar.visible { display: flex; }
+    .spinner {
+      width: 18px; height: 18px;
+      border: 2px solid var(--border);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      flex-shrink: 0;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .status-text { font-size: 0.875rem; color: var(--muted); }
+
+    /* Summary cards */
+    .summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 16px; margin-bottom: 32px; }
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 20px;
+    }
+    .card-label { font-size: 0.75rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 8px; }
+    .card-value { font-size: 2rem; font-weight: 700; }
+    .card-sub { font-size: 0.75rem; color: var(--muted); margin-top: 4px; }
+    .card.critical .card-value { color: var(--critical); }
+    .card.serious .card-value { color: var(--serious); }
+    .card.moderate .card-value { color: var(--moderate); }
+    .card.minor .card-value { color: var(--minor); }
+    .card.total .card-value { color: var(--accent-light); }
+
+    /* Filters */
+    .filters {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-bottom: 24px;
+      align-items: center;
+    }
+    .filters label { font-size: 0.8rem; color: var(--muted); margin-right: 4px; }
+    .filter-btn {
+      padding: 6px 14px;
+      border-radius: 20px;
+      border: 1px solid var(--border);
+      background: transparent;
+      color: var(--muted);
+      font-size: 0.8rem;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .filter-btn.active, .filter-btn:hover { background: var(--surface2); color: var(--text); border-color: var(--accent); }
+    .filter-btn.critical.active { background: var(--critical); color: #fff; border-color: var(--critical); }
+    .filter-btn.serious.active { background: var(--serious); color: #fff; border-color: var(--serious); }
+    .filter-btn.moderate.active { background: var(--moderate); color: #000; border-color: var(--moderate); }
+    .filter-btn.minor.active { background: var(--minor); color: #000; border-color: var(--minor); }
+
+    /* Violation cards */
+    .violations-list { display: flex; flex-direction: column; gap: 16px; }
+    .violation {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      overflow: hidden;
+    }
+    .violation-header {
+      display: flex;
+      align-items: flex-start;
+      gap: 14px;
+      padding: 18px 20px;
+      cursor: pointer;
+      user-select: none;
+    }
+    .violation-header:hover { background: var(--surface2); }
+
+    .impact-badge {
+      padding: 4px 10px;
+      border-radius: 6px;
+      font-size: 0.7rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      flex-shrink: 0;
+      margin-top: 2px;
+    }
+    .impact-badge.critical { background: rgba(255,71,87,.15); color: var(--critical); border: 1px solid var(--critical); }
+    .impact-badge.serious { background: rgba(255,107,53,.15); color: var(--serious); border: 1px solid var(--serious); }
+    .impact-badge.moderate { background: rgba(255,165,2,.15); color: var(--moderate); border: 1px solid var(--moderate); }
+    .impact-badge.minor { background: rgba(46,213,115,.15); color: var(--minor); border: 1px solid var(--minor); }
+
+    .violation-title { flex: 1; }
+    .violation-title h3 { font-size: 0.95rem; font-weight: 600; margin-bottom: 4px; }
+    .violation-title p { font-size: 0.8rem; color: var(--muted); }
+
+    .wcag-badge {
+      font-size: 0.7rem;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 3px 8px;
+      color: var(--accent-light);
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+
+    .chevron {
+      color: var(--muted);
+      transition: transform 0.2s;
+      flex-shrink: 0;
+      font-size: 1rem;
+    }
+    .violation.open .chevron { transform: rotate(180deg); }
+
+    .violation-body { display: none; border-top: 1px solid var(--border); }
+    .violation.open .violation-body { display: block; }
+
+    .tabs {
+      display: flex;
+      gap: 0;
+      border-bottom: 1px solid var(--border);
+      padding: 0 20px;
+      background: var(--surface2);
+    }
+    .tab {
+      padding: 10px 16px;
+      font-size: 0.8rem;
+      cursor: pointer;
+      color: var(--muted);
+      border-bottom: 2px solid transparent;
+      transition: color 0.15s;
+    }
+    .tab.active { color: var(--accent-light); border-bottom-color: var(--accent); }
+
+    .tab-content { display: none; padding: 20px; }
+    .tab-content.active { display: block; }
+
+    .node-item {
+      background: var(--code-bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 14px;
+      margin-bottom: 10px;
+    }
+    .node-item:last-child { margin-bottom: 0; }
+    .node-selector {
+      font-size: 0.72rem;
+      color: var(--accent-light);
+      font-family: monospace;
+      margin-bottom: 8px;
+    }
+    .node-html {
+      font-family: monospace;
+      font-size: 0.78rem;
+      color: #a8d8a8;
+      white-space: pre-wrap;
+      word-break: break-all;
+      margin-bottom: 8px;
+    }
+    .node-failure {
+      font-size: 0.78rem;
+      color: var(--critical);
+    }
+
+    pre.fix-code {
+      background: var(--code-bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 16px;
+      font-size: 0.78rem;
+      font-family: 'Consolas', 'Monaco', monospace;
+      white-space: pre-wrap;
+      word-break: break-word;
+      color: #a8d8a8;
+      line-height: 1.6;
+    }
+
+    .fix-description {
+      background: rgba(108,99,255,0.08);
+      border-left: 3px solid var(--accent);
+      padding: 12px 16px;
+      border-radius: 0 8px 8px 0;
+      font-size: 0.85rem;
+      color: var(--text);
+      margin-bottom: 16px;
+    }
+
+    .resource-link {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      color: var(--accent-light);
+      font-size: 0.8rem;
+      text-decoration: none;
+      margin-top: 12px;
+    }
+    .resource-link:hover { text-decoration: underline; }
+
+    /* Empty / loading states */
+    .empty-state {
+      text-align: center;
+      padding: 60px 20px;
+      color: var(--muted);
+    }
+    .empty-state .icon { font-size: 3rem; margin-bottom: 16px; }
+    .empty-state h3 { font-size: 1rem; margin-bottom: 8px; color: var(--text); }
+    .empty-state p { font-size: 0.875rem; }
+
+    .audit-url {
+      font-size: 0.8rem;
+      color: var(--muted);
+      margin-bottom: 24px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px 14px;
+    }
+    .audit-url span { color: var(--accent-light); }
+
+    .pass-banner {
+      background: rgba(38,222,129,.08);
+      border: 1px solid var(--pass);
+      border-radius: 12px;
+      padding: 24px;
+      text-align: center;
+      color: var(--pass);
+      font-size: 1rem;
+      font-weight: 600;
+      margin-bottom: 24px;
+    }
+
+    #results { display: none; }
+    #results.visible { display: block; }
+
+    .error-box {
+      background: rgba(255,71,87,.08);
+      border: 1px solid var(--critical);
+      border-radius: 10px;
+      padding: 16px 20px;
+      color: var(--critical);
+      font-size: 0.875rem;
+      margin-top: 16px;
+      display: none;
+    }
+    .error-box.visible { display: block; }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="logo" aria-hidden="true">♿</div>
+    <div>
+      <h1>WCAG Accessibility Reporter</h1>
+      <p>Powered by Cypress + axe-core — WCAG 2.1 AA</p>
+    </div>
+  </header>
+
+  <main class="main" id="main-content">
+    <section class="url-section" aria-labelledby="audit-heading">
+      <h2 id="audit-heading">Audit a URL</h2>
+      <p>Enter any publicly accessible web page. The agent will run a full WCAG 2.1 AA audit using axe-core and generate a detailed report with fix guidance.</p>
+      <div class="url-form">
+        <input
+          type="url"
+          id="url-input"
+          class="url-input"
+          placeholder="https://example.com"
+          aria-label="URL to audit"
+          autocomplete="off"
+        />
+        <button class="btn btn-primary" id="run-btn" onclick="startAudit()">Run Audit</button>
+      </div>
+      <div class="status-bar" id="status-bar" role="status" aria-live="polite">
+        <div class="spinner" aria-hidden="true"></div>
+        <span class="status-text" id="status-text">Starting Cypress...</span>
+      </div>
+      <div class="error-box" id="error-box" role="alert"></div>
+    </section>
+
+    <section id="results" aria-label="Audit results">
+      <div class="audit-url" id="audit-url-display"></div>
+
+      <div class="summary" id="summary-cards"></div>
+
+      <div class="filters" id="filters" role="group" aria-label="Filter by impact">
+        <span class="filters-label" style="font-size:0.8rem;color:var(--muted);">Filter:</span>
+      </div>
+
+      <div class="violations-list" id="violations-list"></div>
+    </section>
+  </main>
+
+  <script>
+    let pollInterval = null
+    let activeFilter = 'all'
+
+    function startAudit() {
+      const url = document.getElementById('url-input').value.trim()
+      if (!url.startsWith('http')) {
+        showError('Please enter a valid URL starting with http:// or https://')
+        return
+      }
+      hideError()
+      document.getElementById('results').classList.remove('visible')
+      document.getElementById('run-btn').disabled = true
+      document.getElementById('status-bar').classList.add('visible')
+      setStatus('Starting Cypress audit...')
+
+      fetch('/api/audit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url })
+      })
+        .then(r => r.json())
+        .then(data => {
+          if (data.error) { showError(data.error); resetUI(); return }
+          pollForResults()
+        })
+        .catch(e => { showError('Failed to start audit: ' + e.message); resetUI() })
+    }
+
+    function pollForResults() {
+      let dots = 0
+      pollInterval = setInterval(() => {
+        dots = (dots + 1) % 4
+        fetch('/api/status')
+          .then(r => r.json())
+          .then(status => {
+            const lastLog = status.log.slice(-1)[0] || 'Running axe-core checks'
+            setStatus(lastLog.replace(/^\[stderr\] /, '') + '.'.repeat(dots))
+
+            if (status.error) {
+              clearInterval(pollInterval)
+              showError(status.error + '<br><small>Logs: ' + status.log.slice(-5).join('<br>') + '</small>')
+              resetUI()
+              return
+            }
+
+            if (!status.running) {
+              clearInterval(pollInterval)
+              loadResults()
+            }
+          })
+          .catch(() => {})
+      }, 1500)
+    }
+
+    function loadResults() {
+      fetch('/api/results')
+        .then(r => r.json())
+        .then(data => {
+          if (data.error) { showError(data.error); resetUI(); return }
+          renderResults(data)
+          resetUI()
+          document.getElementById('status-bar').classList.remove('visible')
+        })
+        .catch(e => { showError('Could not load results: ' + e.message); resetUI() })
+    }
+
+    function renderResults(data) {
+      const resultsEl = document.getElementById('results')
+      resultsEl.classList.add('visible')
+
+      document.getElementById('audit-url-display').innerHTML =
+        `Audited: <span>${escHtml(data.url)}</span> &nbsp;·&nbsp; ${new Date(data.timestamp).toLocaleString()}`
+
+      const s = data.summary
+      document.getElementById('summary-cards').innerHTML = `
+        <div class="card total"><div class="card-label">Total Violations</div><div class="card-value">${s.total}</div><div class="card-sub">Issues found</div></div>
+        <div class="card critical"><div class="card-label">Critical</div><div class="card-value">${s.critical}</div><div class="card-sub">Must fix</div></div>
+        <div class="card serious"><div class="card-label">Serious</div><div class="card-value">${s.serious}</div><div class="card-sub">High priority</div></div>
+        <div class="card moderate"><div class="card-label">Moderate</div><div class="card-value">${s.moderate}</div><div class="card-sub">Medium priority</div></div>
+        <div class="card minor"><div class="card-label">Minor</div><div class="card-value">${s.minor}</div><div class="card-sub">Low priority</div></div>
+      `
+
+      buildFilters(data.violations)
+
+      if (data.violations.length === 0) {
+        document.getElementById('violations-list').innerHTML = `
+          <div class="pass-banner">No violations found — this page passes WCAG 2.1 AA checks!</div>`
+        document.getElementById('filters').style.display = 'none'
+        return
+      }
+
+      document.getElementById('filters').style.display = 'flex'
+      renderViolations(data.violations)
+    }
+
+    function buildFilters(violations) {
+      const counts = { all: violations.length, critical: 0, serious: 0, moderate: 0, minor: 0 }
+      violations.forEach(v => counts[v.impact] = (counts[v.impact] || 0) + 1)
+
+      const filtersEl = document.getElementById('filters')
+      filtersEl.innerHTML = '<span style="font-size:0.8rem;color:var(--muted);">Filter:</span>'
+
+      const labels = { all: 'All', critical: 'Critical', serious: 'Serious', moderate: 'Moderate', minor: 'Minor' }
+      Object.entries(counts).forEach(([key, count]) => {
+        if (count === 0 && key !== 'all') return
+        const btn = document.createElement('button')
+        btn.className = `filter-btn ${key} ${key === activeFilter ? 'active' : ''}`
+        btn.textContent = `${labels[key]} (${count})`
+        btn.onclick = () => { activeFilter = key; document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active')); btn.classList.add('active'); filterViolations(key) }
+        filtersEl.appendChild(btn)
+      })
+    }
+
+    let allViolations = []
+
+    function renderViolations(violations) {
+      allViolations = violations
+      filterViolations(activeFilter)
+    }
+
+    function filterViolations(impact) {
+      const list = document.getElementById('violations-list')
+      const filtered = impact === 'all' ? allViolations : allViolations.filter(v => v.impact === impact)
+
+      if (filtered.length === 0) {
+        list.innerHTML = '<div class="empty-state"><div class="icon">✓</div><h3>No violations for this filter</h3></div>'
+        return
+      }
+
+      list.innerHTML = filtered.map((v, i) => buildViolationCard(v, i)).join('')
+
+      list.querySelectorAll('.violation-header').forEach(header => {
+        header.addEventListener('click', () => {
+          const card = header.closest('.violation')
+          card.classList.toggle('open')
+        })
+        header.addEventListener('keydown', e => {
+          if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); header.click() }
+        })
+
+        header.querySelectorAll('.tab').forEach(tab => {
+          tab.addEventListener('click', e => {
+            e.stopPropagation()
+            const body = header.nextElementSibling
+            body.querySelectorAll('.tab').forEach(t => t.classList.remove('active'))
+            body.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'))
+            tab.classList.add('active')
+            body.querySelector(`[data-tab="${tab.dataset.target}"]`).classList.add('active')
+          })
+        })
+      })
+    }
+
+    function buildViolationCard(v, i) {
+      const nodes = v.nodes.map(n => `
+        <div class="node-item">
+          <div class="node-selector">${escHtml(Array.isArray(n.target) ? n.target.join(' ') : n.target)}</div>
+          <div class="node-html">${escHtml(n.html)}</div>
+          ${n.failureSummary ? `<div class="node-failure">${escHtml(n.failureSummary)}</div>` : ''}
+        </div>`).join('')
+
+      return `
+      <article class="violation" id="v-${i}">
+        <div class="violation-header" role="button" tabindex="0" aria-expanded="false" aria-controls="vb-${i}">
+          <span class="impact-badge ${v.impact}">${v.impact}</span>
+          <div class="violation-title">
+            <h3>${escHtml(v.help)}</h3>
+            <p>${escHtml(v.description)} &nbsp;·&nbsp; ${v.nodes.length} element${v.nodes.length !== 1 ? 's' : ''}</p>
+          </div>
+          <span class="wcag-badge">WCAG ${v.wcagCriterion} (${v.wcagLevel})</span>
+          <span class="chevron" aria-hidden="true">▼</span>
+        </div>
+        <div class="violation-body" id="vb-${i}">
+          <div class="tabs">
+            <div class="tab active" data-target="fix-${i}">How to Fix</div>
+            <div class="tab" data-target="elements-${i}">Affected Elements (${v.nodes.length})</div>
+            <div class="tab" data-target="info-${i}">WCAG Info</div>
+          </div>
+          <div class="tab-content active" data-tab="fix-${i}">
+            <div class="fix-description">${escHtml(v.fixDescription)}</div>
+            <pre class="fix-code">${escHtml(v.fixCode)}</pre>
+            <a class="resource-link" href="${escHtml(v.helpUrl)}" target="_blank" rel="noopener">
+              ↗ Full rule documentation (Deque University)
+            </a>
+          </div>
+          <div class="tab-content" data-tab="elements-${i}">${nodes}</div>
+          <div class="tab-content" data-tab="info-${i}">
+            <div class="node-item">
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;font-size:0.85rem;">
+                <div><strong>Rule ID</strong><br><code style="color:var(--accent-light)">${escHtml(v.id)}</code></div>
+                <div><strong>WCAG Criterion</strong><br>${escHtml(v.wcagCriterion)}</div>
+                <div><strong>Conformance Level</strong><br><span style="color:var(--moderate)">${escHtml(v.wcagLevel)}</span></div>
+                <div><strong>Principle</strong><br>${escHtml(v.principle)}</div>
+                <div style="grid-column:1/-1"><strong>Tags</strong><br><span style="color:var(--muted);font-size:0.78rem">${(v.tags || []).join(', ')}</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </article>`
+    }
+
+    function setStatus(msg) {
+      document.getElementById('status-text').textContent = msg.slice(0, 120)
+    }
+    function showError(msg) {
+      const el = document.getElementById('error-box')
+      el.innerHTML = msg
+      el.classList.add('visible')
+    }
+    function hideError() {
+      document.getElementById('error-box').classList.remove('visible')
+    }
+    function resetUI() {
+      document.getElementById('run-btn').disabled = false
+    }
+    function escHtml(s) {
+      if (!s) return ''
+      return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')
+    }
+
+    document.getElementById('url-input').addEventListener('keydown', e => {
+      if (e.key === 'Enter') startAudit()
+    })
+  </script>
+</body>
+</html>
